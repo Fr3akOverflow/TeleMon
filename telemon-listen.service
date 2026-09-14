@@ -1,0 +1,13 @@
+[Unit]
+Description=TeleMon Telegram Listener (Long-Polling)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+ExecStart=/opt/telemon/.venv/bin/python /opt/telemon/telemon.py listen --config /opt/telemon/config.toml
+
+[Install]
+WantedBy=multi-user.target

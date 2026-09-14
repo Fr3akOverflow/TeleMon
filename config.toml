@@ -1,0 +1,17 @@
+# TeleMon Konfiguration
+# BotToken von https://t.me/BotFather erzeugen.
+# chat_ids = deine Telegram-User-IDs (eine oder mehrere, kommasepariert).
+
+[telegram]
+bot_token = "123456:YOUR-TOKEN"
+chat_ids = ["YOUR-CHAT-ID"]
+
+[thresholds]
+cpu_percent = 90.0
+memory_percent = 90.0
+disk_percent = 85.0
+load1 = 4.0
+
+# Interval in Sekunden für den Timer-Check (install.sh setzt den Timer entsprechend)
+[interval]
+seconds = 300

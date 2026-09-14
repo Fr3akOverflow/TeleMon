@@ -1,0 +1,9 @@
+[Unit]
+Description=TeleMon Systemüberwachung Timer
+
+[Timer]
+OnUnitActiveSec=300
+OnBootSec=60
+
+[Install]
+WantedBy=timers.target

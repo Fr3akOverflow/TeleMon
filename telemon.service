@@ -1,0 +1,6 @@
+[Unit]
+Description=TeleMon Systemüberwachung Check
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/telemon check
