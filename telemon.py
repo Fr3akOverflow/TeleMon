@@ -306,6 +306,17 @@ def listen(cfg, cfg_path):
             time.sleep(2)
 
 
+def detect_companions():
+    """Erkennt installierte Begleitprojekte (netmon, Bandbreitentest) an ihrer systemd-Unit."""
+    units = Path("/etc/systemd/system")
+    found = []
+    if (units / "netmon.service").exists():
+        found.append("netmon")
+    if (units / "bandbreite-app.service").exists():
+        found.append("Bandbreitentest")
+    return found
+
+
 def build_report(cfg):
     m = get_metrics()
     t = cfg.get("thresholds", {})
@@ -328,6 +339,9 @@ def build_report(cfg):
         f"⬇️  down : {m['net'].bytes_recv // 2**20} MB",
         "",
     ]
+    extras = detect_companions()
+    if extras:
+        lines.append("🧩 Erweiterungen: " + ", ".join(extras))
     alerts = []
     if cpu >= cpu_max:
         alerts.append(f"⚠️ CPU {fmt(cpu)} ≥ {cpu_max}%")
