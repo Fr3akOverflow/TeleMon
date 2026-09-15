@@ -127,7 +127,8 @@ HELP_TEXT = (
     "             (cpu, mem, disk, load, interval)\n"
     "/clients    - Liste der Empfänger\n"
     "/addclient <id>  - neuen Empfänger hinzufügen\n"
-    "/delclient <id>  - Empfänger entfernen\n\n"
+    "/delclient <id>  - Empfänger entfernen\n"
+    "/speedtest [30|60|120] - Bandbreitentest-Daten des Zeitfensters\n\n"
     "Alerts: CPU/RAM/Disk/Load werden überwacht.\n"
     "Nachrichten kommen nur bei Über-/Unterschreiten."
 )
@@ -275,6 +276,13 @@ def poll_commands(cfg, cfg_path, timeout=0):
                 reply = format_settings(cfg)
             elif cmd == "/clients":
                 reply = format_clients(cfg)
+            elif cmd == "/speedtest":
+                if len(parts) == 1:
+                    reply = band_report()
+                elif len(parts) == 2 and parts[1].isdigit() and int(parts[1]) in (30, 60, 120):
+                    reply = band_report(int(parts[1]))
+                else:
+                    reply = "Nur 30, 60 oder 120 Minuten erlaubt (z. B. /speedtest 60)."
             elif cmd == "/set" and len(parts) == 3:
                 reply = apply_setting(cfg, cfg_path, parts[1].lower(), parts[2])
             elif cmd == "/addclient" and len(parts) == 2:
@@ -315,6 +323,37 @@ def detect_companions():
     if (units / "bandbreite-app.service").exists():
         found.append("Bandbreitentest")
     return found
+
+
+BAND_DATA = Path("/home/bandbreitentest/Bandbreitentest/data.json")
+
+BAND_FIELDS = (
+    ("Ping", "ping", "ms"),
+    ("Download", "download", "Mbit/s"),
+    ("Upload", "upload", "Mbit/s"),
+)
+
+
+def band_report(minutes=30):
+    """Aggregiere Bandbreitentest-Messungen der letzten `minutes` Minuten."""
+    try:
+        data = json.loads(BAND_DATA.read_text())
+    except (OSError, ValueError):
+        return "⚠️ Bandbreitentest ist nicht installiert oder data.json fehlt/defekt."
+    cutoff = time.time() - minutes * 60
+    rows = [e for e in data if isinstance(e, dict) and e.get("timestamp", 0) >= cutoff]
+    if not rows:
+        return f"Keine Messungen in den letzten {minutes} Min."
+    lines = [f"📊 Bandbreitentest · letzte {minutes} Min", f"Messungen: {len(rows)}"]
+    for label, key, unit in BAND_FIELDS:
+        vals = [e[key] for e in rows if e.get(key) is not None]
+        if not vals:
+            continue
+        avg = sum(vals) / len(vals)
+        lines.append(
+            f"{label:<9}: {avg:.1f} {unit} (min {min(vals):.1f} / max {max(vals):.1f})"
+        )
+    return "\n".join(lines)
 
 
 def build_report(cfg):
