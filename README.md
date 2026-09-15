@@ -77,6 +77,7 @@ Einstellungen per Telegram ändern**:
 | `/clients` | Liste der Empfänger |
 | `/addclient 123456` | neuen Empfänger hinzufügen |
 | `/delclient 123456` | Empfänger entfernen |
+| `/alarm on\|off` | automatische Alarme aktivieren/deaktivieren |
 | `/speedtest [30\|60\|120]` | [Bandbreitentest](#bandbreitentest)–Daten der letzten 30/60/120 Min |
 | `/netmon [status\|report\|ping]` | [netmon](#netmon)-Daten abfragen |
 
@@ -90,6 +91,17 @@ Beispiel:
 `/set interval` schreibt den neuen Wert nicht nur in `config.toml`, sondern
 aktualisiert auch den systemd-Timer (`telemon.timer`) und startet ihn neu —
 ohne Neustart des Dienstes.
+
+Automatische **Alarme sind nach der Installation standardmäßig deaktiviert**
+(keine unerwünschten Nachrichten). Aktivieren/deaktivieren per Telegram:
+
+```
+/alarm on      → 🔔 Alarme aktiviert
+/alarm off     → 🔕 Alarme deaktiviert
+/alarm         → aktueller Status (ON/OFF)
+```
+
+`/status`, `/netmon` und `/speedtest` funktionieren unabhängig davon immer.
 
 Die Befehle funktionieren auch, wenn der Listener einmal ausfällt: Der
 Timer-Check verarbeitet versäumte Kommandos beim nächsten Lauf nach.
@@ -157,6 +169,9 @@ load1 = 4.0
 
 [interval]
 seconds = 300
+
+[alerts]
+enabled = false
 ```
 
 Nach Änderungen an `chat_ids`/`thresholds` einfach `systemctl restart telemon-listen.service`.

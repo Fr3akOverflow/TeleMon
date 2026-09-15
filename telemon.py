@@ -128,18 +128,36 @@ HELP_TEXT = (
     "/clients    - Liste der Empfänger\n"
     "/addclient <id>  - neuen Empfänger hinzufügen\n"
     "/delclient <id>  - Empfänger entfernen\n"
+    "/alarm on|off - Alarme aktivieren/deaktivieren\n"
     "/speedtest [30|60|120] - Bandbreitentest-Daten des Zeitfensters\n"
     "/netmon [status|report|ping] - netmon-Daten abfragen\n\n"
     "Alerts: CPU/RAM/Disk/Load werden überwacht.\n"
-    "Nachrichten kommen nur bei Über-/Unterschreiten."
+    "Nachrichten kommen nur bei Über-/Unterschreiten. (Standard: aus)\n"
+    "Aktivieren: /alarm on"
 )
+
+
+def alerts_enabled(cfg):
+    return bool(cfg.get("alerts", {}).get("enabled", False))
+
+
+def handle_alarm(cfg, cfg_path, value):
+    if value not in ("on", "off"):
+        return "Nutzung: /alarm on | /alarm off"
+    cfg.setdefault("alerts", {})["enabled"] = value == "on"
+    save_config(cfg_path, cfg)
+    if value == "on":
+        return "🔔 Alarme aktiviert. Sie warnen ab dem nächsten Check."
+    return "🔕 Alarme deaktiviert. Keine automatischen Meldungen mehr."
 
 
 def format_settings(cfg):
     t = cfg.get("thresholds", {})
     iv = cfg.get("interval", {}).get("seconds", 300)
+    alarm = "ON" if alerts_enabled(cfg) else "OFF"
     return (
         "⚙️ Einstellungen:\n\n"
+        f"Alarm          : {alarm}  (/alarm on|off)\n"
         f"CPU-Schwelle    : {t.get('cpu_percent', 90)}%\n"
         f"RAM-Schwelle    : {t.get('memory_percent', 90)}%\n"
         f"Disk-Schwelle   : {t.get('disk_percent', 85)}%\n"
@@ -284,6 +302,11 @@ def poll_commands(cfg, cfg_path, timeout=0):
                     reply = band_report(int(parts[1]))
                 else:
                     reply = "Nur 30, 60 oder 120 Minuten erlaubt (z. B. /speedtest 60)."
+            elif cmd == "/alarm":
+                if len(parts) == 1:
+                    reply = "🔔 Alarme sind aktiviert." if alerts_enabled(cfg) else "🔕 Alarme sind deaktiviert."
+                else:
+                    reply = handle_alarm(cfg, cfg_path, parts[1].lower())
             elif cmd == "/netmon":
                 sub = parts[1] if len(parts) > 1 else "status"
                 reply = {
@@ -565,7 +588,8 @@ def main():
         reset_state()
         return 0
     if args.cmd == "check":
-        send_alerts_from_state(cfg)
+        if alerts_enabled(cfg):
+            send_alerts_from_state(cfg)
         poll_commands(cfg, getattr(args, "config", BASE_DIR / "config.toml"))
         return 0
     if args.cmd == "listen":

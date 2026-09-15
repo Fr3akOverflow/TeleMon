@@ -15,3 +15,7 @@ load1 = 4.0
 # Interval in Sekunden für den Timer-Check (install.sh setzt den Timer entsprechend)
 [interval]
 seconds = 300
+
+# Automatische Alarm-Nachrichten (Standard: aus; aktivieren per Telegram: /alarm on)
+[alerts]
+enabled = false
