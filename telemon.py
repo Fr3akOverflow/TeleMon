@@ -495,6 +495,7 @@ def send_alerts_from_state(cfg):
     disk_max = t.get("disk_percent", 85)
 
     m = get_metrics()
+    boot_at = psutil.boot_time()
     current = {
         "cpu": m["cpu"] >= cpu_max,
         "mem": m["mem"].percent >= mem_max,
@@ -508,10 +509,10 @@ def send_alerts_from_state(cfg):
             state[key] = current[key]
             changed = True
 
-    if state.get("last_boot") not in (None, m["boot"]):
+    if state.get("last_boot") is not None and state.get("last_boot") != boot_at:
         changed = True
         current["__booted"] = True
-    state["last_boot"] = m["boot"]
+    state["last_boot"] = boot_at
 
     if changed:
         save_state(state)
