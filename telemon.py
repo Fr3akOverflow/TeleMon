@@ -128,7 +128,8 @@ HELP_TEXT = (
     "/clients    - Liste der Empfänger\n"
     "/addclient <id>  - neuen Empfänger hinzufügen\n"
     "/delclient <id>  - Empfänger entfernen\n"
-    "/speedtest [30|60|120] - Bandbreitentest-Daten des Zeitfensters\n\n"
+    "/speedtest [30|60|120] - Bandbreitentest-Daten des Zeitfensters\n"
+    "/netmon [status|report|ping] - netmon-Daten abfragen\n\n"
     "Alerts: CPU/RAM/Disk/Load werden überwacht.\n"
     "Nachrichten kommen nur bei Über-/Unterschreiten."
 )
@@ -283,6 +284,13 @@ def poll_commands(cfg, cfg_path, timeout=0):
                     reply = band_report(int(parts[1]))
                 else:
                     reply = "Nur 30, 60 oder 120 Minuten erlaubt (z. B. /speedtest 60)."
+            elif cmd == "/netmon":
+                sub = parts[1] if len(parts) > 1 else "status"
+                reply = {
+                    "status": netmon_status,
+                    "report": netmon_report,
+                    "ping": netmon_ping,
+                }.get(sub, lambda: "Nutzung: /netmon [status|report|ping]" )()
             elif cmd == "/set" and len(parts) == 3:
                 reply = apply_setting(cfg, cfg_path, parts[1].lower(), parts[2])
             elif cmd == "/addclient" and len(parts) == 2:
@@ -354,6 +362,88 @@ def band_report(minutes=30):
             f"{label:<9}: {avg:.1f} {unit} (min {min(vals):.1f} / max {max(vals):.1f})"
         )
     return "\n".join(lines)
+
+
+NETMON_STATE = Path("/var/lib/netmon/state.json")
+NETMON_EVENTS = Path("/var/lib/netmon/events.jsonl")
+NETMON_PING = Path("/var/lib/netmon/ping.jsonl")
+
+
+def net_name(d):
+    return d.get("host") or d.get("vendor") or d.get("mac", "?")
+
+
+def netmon_status():
+    """Aktuell anwesende Geräte (netmon state.json)."""
+    try:
+        st = json.loads(NETMON_STATE.read_text())
+    except (OSError, ValueError):
+        return "⚠️ netmon ist nicht installiert oder state.json fehlt/defekt."
+    devs = [d for d in st.get("devices", {}).values() if d.get("present")]
+    if not devs:
+        return "📡 netmon: Keine Geräte anwesend."
+    lines = [f"📡 netmon · {len(devs)} Gerät(e) anwesend"]
+    now = time.time()
+    for d in sorted(devs, key=lambda d: net_name(d).lower()):
+        seit = int((now - d.get("since", now)) // 60)
+        lines.append(f"{net_name(d):<22} {d.get('ip', ''):<15} seit {seit} min")
+    return "\n".join(lines)
+
+
+def netmon_report(limit=10):
+    """Letzte online/offline-Sessions aus events.jsonl (offen = laufend)."""
+    try:
+        events = [json.loads(l) for l in NETMON_EVENTS.read_text().splitlines() if l.strip()]
+    except (OSError, ValueError):
+        return "⚠️ netmon-Events fehlen oder netmon ist nicht installiert."
+    if not events:
+        return "📡 netmon: Noch keine Events."
+    sess, done = {}, []
+    for e in events:
+        mac = e["mac"]
+        if e["event"] == "online":
+            sess[mac] = {"d": e, "start": e["ts"]}
+        elif e["event"] == "offline" and mac in sess and sess[mac]["start"]:
+            done.append((sess[mac]["d"], sess[mac]["start"], e["ts"]))
+            sess[mac]["start"] = None
+    lines = [f"📡 netmon · Letzte Sitzungen ({len(done)})"]
+    for d, start, end in done[-limit:]:
+        dur = format_duration(end - start)
+        lines.append(f"{net_name(d):<22} {iso_fmt(start)} → {iso_fmt(end)} ({dur})")
+    offen = [s for s in sess.values() if s["start"]]
+    for s in offen:
+        lines.append(
+            f"{net_name(s['d']):<22} {iso_fmt(s['start'])} → läuft weiter "
+            f"({format_duration(time.time() - s['start'])})"
+        )
+    return "\n".join(lines)
+
+
+def netmon_ping():
+    """Letzte Ping-Messung je Gerät aus ping.jsonl."""
+    try:
+        lines = NETMON_PING.read_text().splitlines()
+    except OSError:
+        return "⚠️ netmon-Pingdaten fehlen."
+    if not lines:
+        return "📡 netmon: Noch keine Ping-Daten."
+    last = {}
+    for l in lines:
+        try:
+            e = json.loads(l)
+        except ValueError:
+            continue
+        last[e["mac"]] = e
+    lines = [f"📡 netmon · Letzte Ping-Messungen ({len(last)})"]
+    for e in sorted(last.values(), key=lambda x: (x.get("host") or x["ip"]).lower()):
+        nm = e.get("host") or e.get("vendor") or e["mac"]
+        avg = f"{e['avg_ms']:.1f} ms" if e.get("avg_ms") is not None else "--"
+        lines.append(f"{nm:<22} {e['ip']:<15} {avg:<9} Loss {e.get('loss_pct', 0):.0f}%")
+    return "\n".join(lines)
+
+
+def iso_fmt(ts):
+    return datetime.fromtimestamp(ts).strftime("%d.%m %H:%M")
 
 
 def build_report(cfg):
