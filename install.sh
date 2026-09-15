@@ -34,6 +34,7 @@ good "Python $(python3 --version | awk '{print $2}')"
 
 # ---------------------------------------------------------------- Abhängigkeiten
 say "Installiere Abhängigkeiten (psutil, requests, toml) ..."
+mkdir -p "$TELEMON_DIR"
 if ! python3 -c "import psutil, requests, toml" 2>/dev/null; then
     python3 -m venv "$TELEMON_DIR/.venv" 2>/dev/null || {
         apt-get update -qq
@@ -48,7 +49,6 @@ fi
 good "Python-Abhängigkeiten"
 
 # ---------------------------------------------------------------- Installation
-mkdir -p "$TELEMON_DIR"
 cp "$SCRIPT_DIR/telemon.py" "$TELEMON_DIR/telemon.py"
 chmod +x "$TELEMON_DIR/telemon.py"
 [ -f "$TELEMON_DIR/config.toml" ] || cp "$SCRIPT_DIR/config.toml" "$TELEMON_DIR/config.toml"
@@ -94,6 +94,7 @@ GUIDE
 else
     good "Bot-Zugangsdaten bereits konfiguriert"
 fi
+chmod 600 "$TELEMON_DIR/config.toml"
 
 # ---------------------------------------------------------------- Timer
 say "Richte systemd-Timer ein ..."
