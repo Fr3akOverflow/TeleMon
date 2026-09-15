@@ -9,6 +9,7 @@ Ressourcen-Alerts und Status direkt in deinen Telegram-Chat — ohne Prometheus,
 - Schickt **nur dann** eine Telegram-Nachricht, wenn ein Schwellenwert über- oder unterschritten wird
 - Erkennt **System-Reboots** automatisch
 - Liefert den aktuellen Systemstatus jederzeit per `telemon report` im Terminal
+- **Erkennt automatisch installierte Erweiterungen** ([netmon](https://github.com/Fr3akOverflow/netmon), [Bandbreitentest](https://github.com/Fr3akOverflow/Bandbreitentest)) und lädt deren Daten per Telegram abfragen
 - **Keine Datenbank**, kein Webserver, keine offenen Ports — nur ein Python-Skript + systemd-Timer
 
 ## Komponenten
@@ -23,8 +24,8 @@ Ressourcen-Alerts und Status direkt in deinen Telegram-Chat — ohne Prometheus,
 ## Installation (unter 2 Minuten)
 
 ```bash
-git clone https://github.com/Fr3akOverflow/telemon.git
-cd telemon
+git clone https://github.com/Fr3akOverflow/TeleMon.git
+cd TeleMon
 sudo ./install.sh
 ```
 
@@ -76,6 +77,8 @@ Einstellungen per Telegram ändern**:
 | `/clients` | Liste der Empfänger |
 | `/addclient 123456` | neuen Empfänger hinzufügen |
 | `/delclient 123456` | Empfänger entfernen |
+| `/speedtest [30\|60\|120]` | [Bandbreitentest](#bandbreitentest)–Daten der letzten 30/60/120 Min |
+| `/netmon [status\|report\|ping]` | [netmon](#netmon)-Daten abfragen |
 
 Beispiel:
 ```
@@ -90,6 +93,54 @@ ohne Neustart des Dienstes.
 
 Die Befehle funktionieren auch, wenn der Listener einmal ausfällt: Der
 Timer-Check verarbeitet versäumte Kommandos beim nächsten Lauf nach.
+
+## Erweiterungen erkennen & abfragen
+
+TeleMon erkennt automatisch, ob die Begleitprojekte **netmon** und
+**Bandbreitentest** auf demselben Server installiert sind (anhand ihrer
+systemd-Services) und zeigt sie im `/status`-Report an:
+
+```
+🧩 Erweiterungen: netmon, Bandbreitentest
+```
+
+### Bandbreitentest
+
+Erforderlich: [Bandbreitentest](https://github.com/Fr3akOverflow/Bandbreitentest)
+installiert (liest `/home/bandbreitentest/Bandbreitentest/data.json`).
+
+```
+/speedtest        → letzte 30 Minuten
+/speedtest 60     → letzte 60 Minuten
+/speedtest 120    → letzte 120 Minuten
+```
+
+```
+📊 Bandbreitentest · letzte 60 Min
+Messungen: 9
+Ping     : 9.3 ms (min 8.4 / max 11.3)
+Download : 160.7 Mbit/s (min 160.7 / max 160.7)
+Upload   : 44.0 Mbit/s (min 44.0 / max 44.0)
+```
+
+### netmon
+
+Erforderlich: [netmon](https://github.com/Fr3akOverflow/netmon)
+installiert (liest `/var/lib/netmon/state.json`, `events.jsonl`, `ping.jsonl`).
+
+| Befehl | Funktion |
+|--------|----------|
+| `/netmon` | aktuell anwesende Geräte + seit wann |
+| `/netmon report` | letzte online/offline-Sitzungen mit Dauer |
+| `/netmon ping` | letzte Ping-Messung je Gerät |
+
+```
+📡 netmon · 31 Gerät(e) anwesend
+Raspberry Pi        192.168.150.20  seit 9 min
+iPhone              192.168.150.30  seit 9 min
+```
+
+Sind diese nicht installiert, antworten die Befehle mit einem Hinweis.
 
 ## Konfiguration (config.toml)
 
@@ -123,12 +174,13 @@ Disk  : 35.8% (4835 MB frei)
 ⬆️  up   : 468 MB
 ⬇️  down : 1054 MB
 
-⚠️ CPU 95.0% ≥ 90%
+🧩 Erweiterungen: netmon, Bandbreitentest
+✅ Alle Werte im Rahmen
 ```
 
-Bei Normalisierung:
+Bei Überschreitung:
 ```
-✅ Alle Werte im Rahmen
+⚠️ CPU 95.0% ≥ 90%
 ```
 
 ## Requirements
@@ -147,7 +199,7 @@ systemctl status telemon.timer
 ## Deinstallation
 
 ```bash
-sudo rm -rf /opt/telemon /etc/systemd/system/telemon.{service,timer}
+sudo rm -rf /opt/telemon /etc/systemd/system/telemon.{service,timer,listen.service}
 sudo systemctl daemon-reload
 ```
 
